@@ -186,6 +186,13 @@ def build_ui(service: Service, coordinator: Coordinator, worker: ReminderWorker,
                 sources, f"{row['status']} · {row['provider']} / {row['model']} · trace {row['trace_id']}\n\n"
                 + "\n".join(body.learning_points))
 
+    def disclosure(role_id, request: gr.Request):
+        user = service.actor(actor(request))
+        if not user["is_manager"] or not role_id:
+            return ""
+        row = service.store.one("SELECT conflict_note FROM roles WHERE id=?", (role_id,))
+        return row["conflict_note"] if row and row["conflict_note"] else "No relationship or conflict disclosure recorded."
+
     def review(draft_id, summary, questions, actions, decision, checked, note, request: gr.Request):
         row = service.store.one("SELECT * FROM drafts WHERE id=?", (draft_id,))
         if not row:
@@ -257,6 +264,7 @@ def build_ui(service: Service, coordinator: Coordinator, worker: ReminderWorker,
                 '<p>A prepared team. A clear next step. Follow-through with care.</p></div>'
                 '<div class="demo-banner">Local demonstration · fictional cases · human decisions · private telemetry</div>')
         who = gr.Markdown()
+        gr.Markdown("[Sign out / switch account](/logout)")
         with gr.Row():
             case_id = gr.Dropdown(label="Case workspace", choices=[], scale=5, allow_custom_value=True)
             refresh = gr.Button("Refresh case", scale=1)
@@ -293,6 +301,8 @@ def build_ui(service: Service, coordinator: Coordinator, worker: ReminderWorker,
                     conflict = gr.Textbox(label="Private conflict or relationship disclosure", lines=2)
                     claim_button = gr.Button("Request this role", variant="primary")
                     role_id = gr.Dropdown(label="Role request / assignment", choices=[], allow_custom_value=True)
+                    role_disclosure = gr.Textbox(label="Private relationship disclosure — program manager view",
+                                                 lines=2, interactive=False)
                     role_decision = gr.Radio(["Approve", "Decline"], value="Approve", label="Manager role decision")
                     role_review = gr.Button("Review role request")
                     role_release = gr.Button("Release my role / manager release")
@@ -312,7 +322,7 @@ def build_ui(service: Service, coordinator: Coordinator, worker: ReminderWorker,
                 close_alternative = gr.Button("Manager record alternative closure")
         with gr.Tab("Prepare with AI"):
             gr.Markdown("### Preparation, follow-up, and reflection")
-            gr.Markdown("Use the approved briefing and shared debriefs. Every result stays a draft until reviewed.")
+            gr.Markdown("Use the approved briefing, shared debriefs, and recorded meetings and repair progress. Every result stays a draft until reviewed.")
             with gr.Row():
                 ai_task = gr.Dropdown(AI_TASKS, value=AI_TASKS[0], label="What would help now?", scale=4)
                 generate_ai = gr.Button("Prepare a draft", variant="primary", scale=1)
@@ -391,7 +401,7 @@ def build_ui(service: Service, coordinator: Coordinator, worker: ReminderWorker,
                     new_brief = gr.Textbox(label="Approved briefing — one source statement per line", lines=5)
                     new_report = gr.Textbox(label="Original report, if digitization is permitted", lines=4)
                     new_policy = gr.Radio(["office-only", "secure-team"], value="office-only", label="Report access policy")
-                    new_ai = gr.Checkbox(label="Program authorizes AI processing of this briefing")
+                    new_ai = gr.Checkbox(label="Program authorizes AI processing of the briefing and shared case records")
                     new_synthetic = gr.Checkbox(value=True, label="This is a fictional demonstration case")
                     new_guardian = gr.Checkbox(label="Program requires guardian consent for this case")
                     new_support = gr.Textbox(label="Practical support needs to discuss")
@@ -432,6 +442,7 @@ def build_ui(service: Service, coordinator: Coordinator, worker: ReminderWorker,
         case_id.change(bind(overview), inputs=case_id, outputs=overview_outputs, api_name="case_view")
         refresh.click(bind(overview), inputs=case_id, outputs=overview_outputs)
         draft_id.change(bind(draft_view), inputs=draft_id, outputs=draft_outputs, api_name="draft_view")
+        role_id.change(bind(disclosure), inputs=role_id, outputs=role_disclosure, api_name="role_disclosure")
         inbox_refresh.click(bind(inbox), outputs=[inbox_table, notification_id])
         complete_task.click(mutation(service.complete_task, "Task completed. Refresh the case for the updated list."), task_id, status)
         mark_read.click(mutation(service.read_notification, "Reminder marked read."), notification_id, status)

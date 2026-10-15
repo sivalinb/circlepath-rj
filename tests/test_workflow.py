@@ -27,6 +27,9 @@ def test_role_capacity_and_training(demo):
         service.review_role("avery", request["id"], True)
     service.review_role("manager", request["id"], True)
     assert service.case("riley", cases[0])["report"] == ""
+    with pytest.raises(DomainError, match="every approved"):
+        service.advance("avery", cases[0])
+    assert service.case("manager", cases[0])["readiness"] == 0
     service.add_user("manager", "extra", "Demo extra", "long-test-password", ["Community member"], True)
     request2 = service.claim_role("extra", cases[0], "Community member")
     with pytest.raises(DomainError, match="already filled"):
@@ -141,6 +144,11 @@ def test_complete_case_lifecycle(demo):
                                stamp(start + timedelta(days=12, hours=1)), "Demo office", True)
     service.finish_event("avery", circle)
     assert service.advance("avery", cid) == Stage.CLOSED
+    context = service.ai_snapshot("manager", cid, "Case summary")
+    recorded = " ".join(context["sources"].values())
+    assert "Facilitator reviewed the confirmation." in recorded
+    assert "status=Verified" in recorded
+    assert "Recorded meeting: Reintegration; status=Completed" in recorded
     did = agent.run("manager", cid, "Case summary")
     row = service.drafts("manager", cid)[0]
     assert service.review_draft("manager", did, True, row["body"], "Reviewed.")["created_task_ids"] == []

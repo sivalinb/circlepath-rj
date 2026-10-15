@@ -16,6 +16,7 @@ but real deployment requires the program's own policies, legal review, and secur
 - Ongoing consent, readiness decisions, pausing, alternative closure, and a gated case lifecycle.
 - Persistent SQLite cases, tasks, debriefs, repair commitments, meetings, notifications, and audit records.
 - Live Gemini structured drafting with source references, authorized owners, and human review.
+- Summaries draw on recorded meeting outcomes and repair verification as well as shared debriefs.
 - Preparation questions and language guidance from an editable program playbook.
 - A bounded reminder worker: meeting check-ins, task reminders, repair barriers, and staffing gaps.
 - Team availability intersection, rescheduling, stable calendar IDs, personal `.ics` downloads.

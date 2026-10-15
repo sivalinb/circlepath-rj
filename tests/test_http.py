@@ -19,3 +19,6 @@ def test_http_authentication_and_protected_file_routes(demo):
         metrics = client.get("/metrics/")
         assert metrics.status_code == 200
         assert "circlepath_cases" in metrics.text
+        client.get("/logout")
+        response = client.get("/config")
+        assert response.status_code == 401 or response.json().get("auth_required") is True

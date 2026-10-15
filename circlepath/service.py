@@ -189,6 +189,8 @@ class Service:
             db.execute("UPDATE roles SET status=? WHERE id=?",
                        ("Approved" if approve else "Released", role_id))
             if approve:
+                db.execute("UPDATE cases SET readiness=0,updated_at=? WHERE id=?",
+                           (stamp(), role["case_id"]))
                 db.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?)",
                            (uid(), role["case_id"], "Complete the case review for your role",
                             role["username"], stamp(utcnow() + timedelta(days=2)), "Open",
@@ -281,11 +283,12 @@ class Service:
     def _staffed(db, case_id: str):
         counts = {}
         for row in db.execute(
-            "SELECT r.role,u.trained_roles,u.confidentiality FROM roles r JOIN users u ON u.username=r.username "
-            "WHERE r.case_id=? AND r.status='Approved' AND r.reviewed=1", (case_id,)
+            "SELECT r.role,u.trained_roles,u.confidentiality,r.reviewed FROM roles r JOIN users u ON u.username=r.username "
+            "WHERE r.case_id=? AND r.status='Approved'", (case_id,)
         ):
-            if row[2] and row[0] in json.loads(row[1]):
-                counts[row[0]] = counts.get(row[0], 0) + 1
+            if not row[2] or row[0] not in json.loads(row[1]) or not row[3]:
+                raise DomainError("Have every approved team member review the case and keep training and confidentiality current.")
+            counts[row[0]] = counts.get(row[0], 0) + 1
         if any(counts.get(role, 0) < minimum for role, minimum in MINIMUM_TEAM.items()):
             raise DomainError("Fill the required team and have each member complete their case review.")
 
@@ -611,6 +614,21 @@ class Service:
         if case["stage"] == Stage.CLOSED and task not in {"Case summary", "Learning reflection"}:
             raise DomainError("Only a summary or learning reflection can be drafted after closure.")
         sources = {f"S{i}": line.strip() for i, line in enumerate(case["briefing"].splitlines(), 1) if line.strip()}
+        sources["WORKFLOW"] = f"Recorded workflow stage: {case['stage']}. This is a staff record, not an assessment of healing."
+        if case["support_needs"]:
+            sources["SUPPORT"] = "Recorded practical support needs to confirm: " + case["support_needs"]
+        if case["closure_reason"]:
+            sources["CLOSURE"] = "Manager-recorded alternative closure outcome: " + case["closure_reason"]
+        for repair in self.store.rows("SELECT * FROM repairs WHERE case_id=? ORDER BY due_at", (case_id,)):
+            sources[f"R-{repair['id'][:8]}"] = (
+                f"Recorded participant-agreed commitment: {repair['commitment']}; "
+                f"support owner={repair['owner']}; status={repair['status']}; agreed due={repair['due_at']}; "
+                f"verification plan={repair['verification_plan']}; recorded evidence={repair['evidence']}"
+            )
+        for event in self.store.rows("SELECT id,kind,status,start_at FROM events WHERE case_id=? ORDER BY start_at", (case_id,)):
+            sources[f"M-{event['id'][:8]}"] = (
+                f"Recorded meeting: {event['kind']}; status={event['status']}; scheduled time={event['start_at']}"
+            )
         # Raw reports and private debriefs never enter AI context.
         for note in self.store.rows("SELECT * FROM notes WHERE case_id=? AND private=0 ORDER BY created_at", (case_id,)):
             sources[f"N-{note['id'][:8]}"] = (
