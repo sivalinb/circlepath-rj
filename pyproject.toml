@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "circlepath-rj"
+version = "0.1.0"
+description = "An AI case coordinator for restorative justice, with human decisions and private telemetry."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+  "gradio>=6,<7", "google-genai>=1,<2", "pydantic-settings>=2,<3",
+  "apscheduler>=3.11,<4", "icalendar>=6,<7", "google-auth-oauthlib>=1.2,<2",
+  "opentelemetry-api>=1.36,<2", "opentelemetry-sdk>=1.36,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.36,<2",
+  "opentelemetry-exporter-prometheus>=0.57b0,<1", "prometheus-client>=0.22,<1",
+  "pypdf>=5,<7", "pyyaml>=6,<7"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "ruff>=0.12,<1"]
+
+[project.scripts]
+circlepath = "circlepath.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["circlepath*"]
+
+[tool.setuptools.package-data]
+circlepath = ["*.md", "schema.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "S"]
+ignore = ["S101"]
